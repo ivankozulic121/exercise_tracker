@@ -14,6 +14,12 @@ app.use(bodyParser.urlencoded({
 app.use(cors())
 app.use(express.static('public'))
 
+app.get('/api/users', async (req,res) => {
+    const userList = await User.find({})
+    //console.log("USER LIST:" + userList);
+    return res.json(userList);
+})
+
 
 app.post('/api/users', async(req, res) =>{
     //const { username } = req.body
@@ -25,9 +31,43 @@ app.post('/api/users', async(req, res) =>{
     
 })
 
+app.post('/api/users/:_id/exercises', async(req,res)=>{
+   const query = User.where({_id: req.params._id})
+   const user = await query.findOne()
+
+   if(user) {
+    const exercise = await Exercise.create({user: user._id, username: user.username, description: req.body.description, duration: req.body.duration, date: req.body.date})
+    return res.json({"_id": user._id, "username": user.username, "date": exercise.date, "duration": exercise.duration, "description": exercise.description});
+   }
+
+   else {
+    return mongoose.Error.CastError;
+   }
+})
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/views/index.html')
 });
+
+app.get('/api/users/:_id/exercises', async(req, res) =>{
+  const query = User.where({_id: req.params._id})
+  const userq = await query.findOne();
+  console.log("U:" + userq);
+
+  if(userq) {
+    //const query = Exercise.where({user_id: req.params._id})
+    console.log("Q:" + query);
+    const query1 = Exercise.where({user: userq._id});
+
+    const exercisesbyUser = await query1.find({});
+
+    console.log("E:" + exercisesbyUser);
+    return res.json(exercisesbyUser);
+  }
+
+  else {
+    return mongoose.Error.CastError;
+   }
+})
 
 
 
@@ -58,6 +98,7 @@ const uri = "mongodb://127.0.0.1:27017/local";
 const Teacher = mongoose.model('Teacher', new Schema({first_name: String, last_name: String, work_years: Number}))
 const Exercise = mongoose.model('Exercise', new Schema({user: {type:mongoose.ObjectId, ref:'User'}, description: String, duration: Number, date:Date}))
 const User = mongoose.model('User', new Schema({username: String}))
+//const Log = mongoose.model('Log', new Schema({user:{type:mongoose.ObjectId, ref:'User'},count:0}))
 //const teacher1 = new Teacher({first_name: 'Predo', last_name: 'Predic', work_years: 6})
 //Teacher.create({first_name: 'Predo', last_name: 'Predic', work_years: 6})
 const connectDB = async () => {
