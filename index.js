@@ -51,22 +51,41 @@ app.get('/', (req, res) => {
 app.get('/api/users/:_id/exercises', async(req, res) =>{
   const query = User.where({_id: req.params._id})
   const userq = await query.findOne();
+  //ovo popravi u jednu liniju sve
   console.log("U:" + userq);
 
   if(userq) {
-    //const query = Exercise.where({user_id: req.params._id})
+    const query1 =  Exercise.where({user: userq._id})
     console.log("Q:" + query);
-    const query1 = Exercise.where({user: userq._id});
+    
+    //const count = await query1.countDocuments();
 
     const exercisesbyUser = await query1.find({});
+    //mora await na count
+    const count =  await Exercise.countDocuments({user: userq._id})
 
-    console.log("E:" + exercisesbyUser);
+    console.log("E:" + exercisesbyUser + count );
     return res.json(exercisesbyUser);
   }
 
   else {
     return mongoose.Error.CastError;
    }
+})
+
+app.get('/api/users/:_id/logs', async(req, res) => {
+  
+  const user = await User.where({_id: req.params._id}).findOne();
+
+  if (user) {
+    const userExercises =  await Exercise.where({user: user._id}).find({}).select({_id:0, __v:0, user:0}); // _id:0 znaci da se selektuju sve kolone sem _id
+    const numOfExercises = await Exercise.countDocuments({user: user._id})
+
+    return res.json({username: user.username, count: numOfExercises, _id: user._id, log: userExercises})
+  }
+  else {
+    return mongoose.Error.CastError;
+  }
 })
 
 
