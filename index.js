@@ -15,7 +15,7 @@ app.use(cors())
 app.use(express.static('public'))
 
 app.get('/api/users', async (req,res) => {
-    const userList = await User.find({})
+    const userList = await User.find({}).select({__v:0})
     //console.log("USER LIST:" + userList);
     return res.json(userList);
 })
@@ -32,12 +32,27 @@ app.post('/api/users', async(req, res) =>{
 })
 
 app.post('/api/users/:_id/exercises', async(req,res)=>{
-   const query = User.where({_id: req.params._id})
-   const user = await query.findOne()
+  let { date } = req.body; 
 
+   if(!date){
+     date = new Date()
+   } else {
+     date = new Date(date)
+   }
+  //const reqDate =  new Date(String(req.body.date)) ||  new Date.now();
+  console.log("REQUEST DATE: " + typeof(reqDate));
+   const query = User.where({_id: req.params._id})
+   const user = await query.findOne().select({__v:0})
+  
+
+   
    if(user) {
-    const exercise = await Exercise.create({user: user._id, username: user.username, description: req.body.description, duration: req.body.duration, date: req.body.date})
-    return res.json({"_id": user._id, "username": user.username, "date": exercise.date, "duration": exercise.duration, "description": exercise.description});
+    
+    const exercise = await Exercise.create({user: user._id, username: user.username, description: req.body.description, duration: parseInt(req.body.duration), date: date})
+    console.log("EXERCISE DATE: " + typeof(exercise.date));
+    const formattedDate = formatDate(exercise.date)
+    return res.json({"username": user.username, "description": exercise.description,  "duration": exercise.duration, "date": formattedDate, "_id": user._id });
+    //return res.json(user);
    }
 
    else {
@@ -55,6 +70,7 @@ app.get('/api/users/:_id/exercises', async(req, res) =>{
   console.log("U:" + userq);
 
   if(userq) {
+    
     const query1 =  Exercise.where({user: userq._id})
     console.log("Q:" + query);
     
@@ -74,14 +90,36 @@ app.get('/api/users/:_id/exercises', async(req, res) =>{
 })
 
 app.get('/api/users/:_id/logs', async(req, res) => {
+
+  const { from, to } = req.query
+  let startDate = new Date(from);
+  let endDate = new Date(to);
+  const limit = parseInt(req.query.limit) || undefined;
+  
+  if (isNaN(startDate.getTime())) {
+    startDate = new Date('1900-01-01');
+}
+
+if (isNaN(endDate.getTime())) {
+  endDate = Date.now();
+}
   
   const user = await User.where({_id: req.params._id}).findOne();
 
   if (user) {
-    const userExercises =  await Exercise.where({user: user._id}).find({}).select({_id:0, __v:0, user:0}); // _id:0 znaci da se selektuju sve kolone sem _id
+    const userExercises =  await Exercise.where({user: user._id},{date: { $gte: startDate, $lte: endDate }}).find({}).select({_id:0, __v:0, user:0}).limit(limit); // _id:0 znaci da se selektuju sve kolone sem _id
+    const formattedUserExercises = userExercises.map( x=> {
+      return {
+        description: x.description,
+        duration: x.duration,
+        date: formatDate(x.date)
+      };
+    });
     const numOfExercises = await Exercise.countDocuments({user: user._id})
-
-    return res.json({username: user.username, count: numOfExercises, _id: user._id, log: userExercises})
+    for ( let i in userExercises){
+      console.log("DATE TYPE: " + i.date);
+    }
+    return res.json({username: user.username, count: numOfExercises, _id: user._id, log: formattedUserExercises })
   }
   else {
     return mongoose.Error.CastError;
@@ -89,7 +127,12 @@ app.get('/api/users/:_id/logs', async(req, res) => {
 })
 
 
-
+function formatDate (bodyDate){
+  const newDate = new Date(bodyDate);
+  const formattedDate = newDate.toDateString();
+  return formattedDate;
+  
+}
 
 
 // Replace the uri string with your connection string.
@@ -115,7 +158,7 @@ run().catch(console.dir);*/
 const Schema = mongoose.Schema;
 const uri = "mongodb://127.0.0.1:27017/local";
 const Teacher = mongoose.model('Teacher', new Schema({first_name: String, last_name: String, work_years: Number}))
-const Exercise = mongoose.model('Exercise', new Schema({user: {type:mongoose.ObjectId, ref:'User'}, description: String, duration: Number, date:Date}))
+const Exercise = mongoose.model('Exercise', new Schema({user: {type:mongoose.ObjectId, ref:'User'}, description: String, duration: Number, date: Date}))
 const User = mongoose.model('User', new Schema({username: String}))
 //const Log = mongoose.model('Log', new Schema({user:{type:mongoose.ObjectId, ref:'User'},count:0}))
 //const teacher1 = new Teacher({first_name: 'Predo', last_name: 'Predic', work_years: 6})
